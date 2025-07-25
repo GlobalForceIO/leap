@@ -1647,6 +1647,50 @@
           "type": "asset"
         }
       ]
+    },
+    {
+      "name": "config_fee",
+      "base": "",
+      "fields": [
+        {
+          "name": "version",
+          "type": "uint8"
+        },
+        {
+          "name": "ram_fee",
+          "type": "uint64"
+        },
+        {
+          "name": "cpu_fee",
+          "type": "uint64"
+        },
+        {
+          "name": "net_fee",
+          "type": "uint64"
+        }
+      ]
+    },
+    {
+      "name": "billed_fee",
+      "base": "",
+      "fields": [
+        {
+          "name": "account",
+          "type": "name"
+        },
+        {
+          "name": "ram",
+          "type": "uint64"
+        },
+        {
+          "name": "cpu",
+          "type": "uint64"
+        },
+        {
+          "name": "net",
+          "type": "uint64"
+        }
+      ]
     }
   ],
   "actions": [
@@ -2080,6 +2124,20 @@
       "key_names": [],
       "key_types": [],
       "type": "voter_info"
+    },
+    {
+      "name": "configfee",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "config_fee"
+    },
+    {
+      "name": "billedfee",
+      "index_type": "i64",
+      "key_names": [],
+      "key_types": [],
+      "type": "billed_fee"
     }
   ],
   "ricardian_clauses": [],

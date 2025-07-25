@@ -324,12 +324,35 @@ namespace eosio { namespace chain { namespace resource_limits {
       >
    >;
 
+   /**
+    * Every account that authorizes a transaction saved writed size of used RAM CPU NET.
+    */
+   struct resource_billtrxs_object : public chainbase::object<resource_billtrxs_object_type, resource_billtrxs_object> {
+      OBJECT_CTOR(resource_billtrxs_object)
+
+      id_type id;
+      account_name owner; //< owner should not be changed within a chainbase modifier lambda
+
+      uint64_t                 net = 0;
+      uint64_t                 ram = 0;
+      uint64_t                 cpu = 0;
+   };
+   
+   using resource_billtrxs_index = chainbase::shared_multi_index_container<
+      resource_billtrxs_object,
+      indexed_by<
+         ordered_unique<tag<by_id>, member<resource_billtrxs_object, resource_billtrxs_object::id_type, &resource_billtrxs_object::id>>,
+         ordered_unique<tag<by_owner>, member<resource_billtrxs_object, account_name, &resource_billtrxs_object::owner> >
+      >
+   >;
+
 } } } /// eosio::chain::resource_limits
 
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::resource_limits::resource_limits_object,        eosio::chain::resource_limits::resource_limits_index)
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::resource_limits::resource_usage_object,         eosio::chain::resource_limits::resource_usage_index)
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::resource_limits::resource_limits_config_object, eosio::chain::resource_limits::resource_limits_config_index)
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::resource_limits::resource_limits_state_object,  eosio::chain::resource_limits::resource_limits_state_index)
+CHAINBASE_SET_INDEX_TYPE(eosio::chain::resource_limits::resource_billtrxs_object,       eosio::chain::resource_limits::resource_billtrxs_index)
 
 FC_REFLECT(eosio::chain::resource_limits::usage_accumulator, (last_ordinal)(value_ex)(consumed))
 
@@ -338,3 +361,4 @@ FC_REFLECT(eosio::chain::resource_limits::resource_limits_object, (owner)(net_we
 FC_REFLECT(eosio::chain::resource_limits::resource_usage_object,  (owner)(net_usage)(cpu_usage)(ram_usage))
 FC_REFLECT(eosio::chain::resource_limits::resource_limits_config_object, (cpu_limit_parameters)(net_limit_parameters)(account_cpu_usage_average_window)(account_net_usage_average_window))
 FC_REFLECT(eosio::chain::resource_limits::resource_limits_state_object, (average_block_net_usage)(average_block_cpu_usage)(pending_net_usage)(pending_cpu_usage)(total_net_weight)(total_cpu_weight)(total_ram_bytes)(virtual_net_limit)(virtual_cpu_limit))
+FC_REFLECT(eosio::chain::resource_limits::resource_billtrxs_object, (owner)(net)(ram)(cpu))

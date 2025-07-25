@@ -21,6 +21,15 @@ bool include_delta(const chain::resource_limits::resource_limits_object& old,
        old.ram_bytes != curr.ram_bytes;
 }
 
+bool include_delta(const eosio::chain::resource_limits::resource_billtrxs_object& old,
+                   const eosio::chain::resource_limits::resource_billtrxs_object& curr) {
+   return                     //
+       old.owner != curr.owner || //
+       old.ram != curr.ram || //
+       old.cpu != curr.cpu || //
+       old.net != curr.net;
+}
+
 bool include_delta(const chain::resource_limits::resource_limits_state_object& old,
                    const chain::resource_limits::resource_limits_state_object& curr) {
    return                                                                                       //
@@ -182,6 +191,7 @@ void pack_deltas(boost::iostreams::filtering_ostreambuf& obuf, const chainbase::
                  pack_row);
    process_table(ds, "resource_limits_config", db.get_index<chain::resource_limits::resource_limits_config_index>(),
                  pack_row);
+   process_table(ds, "resource_billtrxs", db.get_index<chain::resource_limits::resource_billtrxs_index>(), pack_row);
 
    obuf.pubsync();
 

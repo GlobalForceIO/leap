@@ -2394,7 +2394,8 @@ read_only::get_account_return_t read_only::get_account( const get_account_params
    result.privileged       = accnt_metadata_obj.is_privileged();
    result.last_code_update = accnt_metadata_obj.last_code_update;
    result.created          = accnt_obj.creation_date;
-
+   
+   /*
    uint32_t greylist_limit = db.is_resource_greylisted(result.account_name) ? 1 : config::maximum_elastic_resource_multiplier;
    const block_timestamp_type current_usage_time (db.head_block_time());
    result.net_limit.set( rm.get_account_net_limit_ex( result.account_name, greylist_limit, current_usage_time).first );
@@ -2406,6 +2407,7 @@ read_only::get_account_return_t read_only::get_account( const get_account_params
       result.cpu_limit.last_usage_update_time = accnt_obj.creation_date;
    }
    result.ram_usage = rm.get_account_ram_usage( result.account_name );
+   */
 
    eosio::chain::resource_limits::account_resource_limit subjective_cpu_bill_limit;
    subjective_cpu_bill_limit.used = db.get_subjective_billing().get_subjective_bill( result.account_name, fc::time_point::now() );
@@ -2466,6 +2468,7 @@ read_only::get_account_return_t read_only::get_account( const get_account_params
       std::optional<vector<char>> refund_request;
       std::optional<vector<char>> voter_info;
       std::optional<vector<char>> rex_info;
+      std::optional<vector<char>> billed_resources;
    };
 
    http_params_t http_params;
@@ -2508,17 +2511,24 @@ read_only::get_account_return_t read_only::get_account( const get_account_params
          return {};
       };
       
-      http_params.total_resources          = lookup_object("userres"_n, params.account_name);
-      http_params.self_delegated_bandwidth = lookup_object("delband"_n, params.account_name);
-      http_params.refund_request           = lookup_object("refunds"_n, params.account_name);
-      http_params.voter_info               = lookup_object("voters"_n, config::system_account_name);
-      http_params.rex_info                 = lookup_object("rexbal"_n, config::system_account_name);
-      
+      //http_params.total_resources          = lookup_object("userres"_n, params.account_name);
+      //http_params.self_delegated_bandwidth = lookup_object("delband"_n, params.account_name);
+      //http_params.refund_request           = lookup_object("refunds"_n, params.account_name);
+      //http_params.voter_info               = lookup_object("voters"_n, config::system_account_name);
+      //http_params.rex_info                 = lookup_object("rexbal"_n, config::system_account_name);
+      http_params.billed_resources           = lookup_object("billedfee"_n, params.account_name);
+
+      std::vector<uint64_t> accnt_billtrx = rm.get_billtrx_limits( result.account_name );
+      result.use_ram = accnt_billtrx[0];
+      result.use_cpu = accnt_billtrx[1];
+      result.use_net = accnt_billtrx[2];
+   
       return [http_params = std::move(http_params), result = std::move(result), abi=std::move(abi), shorten_abi_errors=shorten_abi_errors,
               abi_serializer_max_time=abi_serializer_max_time]() mutable ->  chain::t_or_exception<read_only::get_account_results> {
          auto yield = [&]() { return abi_serializer::create_yield_function(abi_serializer_max_time); };
          abi_serializer abis(std::move(abi), yield());
          
+         /*
          if (http_params.total_resources)
             result.total_resources = abis.binary_to_variant("user_resources", *http_params.total_resources, yield(), shorten_abi_errors);
          if (http_params.self_delegated_bandwidth)
@@ -2529,6 +2539,11 @@ read_only::get_account_return_t read_only::get_account( const get_account_params
             result.voter_info = abis.binary_to_variant("voter_info", *http_params.voter_info, yield(), shorten_abi_errors);
          if (http_params.rex_info)
             result.rex_info = abis.binary_to_variant("rex_balance", *http_params.rex_info, yield(), shorten_abi_errors);
+         */
+         
+         if (http_params.billed_resources)
+            result.billed_resources = abis.binary_to_variant("billed_fee", *http_params.billed_resources, yield(), shorten_abi_errors);
+         
          return std::move(result);
       };
    }

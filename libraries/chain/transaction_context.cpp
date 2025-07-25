@@ -620,8 +620,6 @@ namespace eosio { namespace chain {
    }
 
    std::tuple<int64_t, int64_t, bool, bool> transaction_context::max_bandwidth_billed_accounts_can_pay( bool force_elastic_limits ) const{
-      // Assumes rl.update_account_usage( bill_to_accounts, block_timestamp_type(control.pending_block_time()).slot ) was already called prior
-
       // Calculate the new highest network usage and CPU time that all of the billed accounts can afford to be billed
       auto& rl = control.get_mutable_resource_limits_manager();
       const static int64_t large_number_no_overflow = std::numeric_limits<int64_t>::max()/2;

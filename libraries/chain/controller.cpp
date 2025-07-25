@@ -1272,6 +1272,13 @@ struct controller_impl {
              || failure_is_subjective(e);
    }
 
+   /* store loaded user balance before push transaction */
+   bool      user_check;
+   uint64_t  user_trx_cpu;
+   uint64_t  user_trx_ram;
+   name      user_name;
+   name      user_action;
+   
    transaction_trace_ptr push_scheduled_transaction( const transaction_id_type& trxid,
                                                      fc::time_point block_deadline, fc::microseconds max_transaction_time,
                                                      uint32_t billed_cpu_time_us, bool explicit_billed_cpu_time = false )
@@ -1488,8 +1495,8 @@ struct controller_impl {
             cpu_time_to_bill_us = limited_cpu_time_to_bill_us;
          }
 
-         resource_limits.add_transaction_usage( trx_context.bill_to_accounts, cpu_time_to_bill_us, 0,
-                                                block_timestamp_type(self.pending_block_time()).slot ); // Should never fail
+         //resource_limits.add_transaction_usage( trx_context.bill_to_accounts, cpu_time_to_bill_us, 0,
+         //                                       block_timestamp_type(self.pending_block_time()).slot ); // Should never fail
 
          trace->receipt = push_receipt(gtrx.trx_id, transaction_receipt::hard_fail, cpu_time_to_bill_us, 0);
          trace->account_ram_delta = account_delta( gtrx.payer, trx_removal_ram_delta );
@@ -1544,7 +1551,7 @@ struct controller_impl {
                                            fc::microseconds max_transaction_time,
                                            uint32_t billed_cpu_time_us,
                                            bool explicit_billed_cpu_time,
-                                           int64_t subjective_cpu_bill_us )
+                                           int64_t subjective_cpu_bill_us, bool user_check )
    {
       EOS_ASSERT(block_deadline != fc::time_point(), transaction_exception, "deadline cannot be uninitialized");
 
@@ -1609,6 +1616,13 @@ struct controller_impl {
             }
             trx_context.exec();
             trx_context.finalize(); // Automatically rounds up network and CPU usage in trace and bills payers if successful
+
+            if(user_check){
+               user_trx_cpu = trx_context.billed_cpu_time_us;
+               user_trx_ram = trx->packed_trx()->get_unprunable_size() + trx->packed_trx()->get_prunable_size() + sizeof( *trx );
+
+               resource_limits.verify_billtrx_pay( user_name, user_action, user_trx_cpu, user_trx_ram, trace->net_usage );
+            }
 
             auto restore = make_block_restore_point( trx->is_read_only() );
 
@@ -1837,7 +1851,7 @@ struct controller_impl {
                });
             in_trx_requiring_checks = true;
             auto trace = push_transaction( onbtrx, fc::time_point::maximum(), fc::microseconds::maximum(),
-                                           gpo.configuration.min_transaction_cpu_usage, true, 0 );
+                                           gpo.configuration.min_transaction_cpu_usage, true, 0, false );
             if( trace->except ) {
                wlog("onblock ${block_num} is REJECTING: ${entire_trace}",("block_num", head->block_num + 1)("entire_trace", trace));
             }
@@ -2120,7 +2134,7 @@ struct controller_impl {
                                                        : ( !!std::get<0>( trx_metas.at( packed_idx ) ) ?
                                                              std::get<0>( trx_metas.at( packed_idx ) )
                                                              : std::get<1>( trx_metas.at( packed_idx ) ).get() ) );
-               trace = push_transaction( trx_meta, fc::time_point::maximum(), fc::microseconds::maximum(), receipt.cpu_usage_us, true, 0 );
+               trace = push_transaction( trx_meta, fc::time_point::maximum(), fc::microseconds::maximum(), receipt.cpu_usage_us, true, 0, false );
                ++packed_idx;
             } else if( std::holds_alternative<transaction_id_type>(receipt.trx) ) {
                trace = push_scheduled_transaction( std::get<transaction_id_type>(receipt.trx), fc::time_point::maximum(), fc::microseconds::maximum(), receipt.cpu_usage_us, true );
@@ -2189,10 +2203,25 @@ struct controller_impl {
 
    // thread safe, expected to be called from thread other than the main thread
    block_state_ptr create_block_state_i( const block_id_type& id, const signed_block_ptr& b, const block_header_state& prev ) {
+      
       auto trx_mroot = calculate_trx_merkle( b->transactions );
-      EOS_ASSERT( b->transaction_mroot == trx_mroot, block_validate_exception,
+
+      if(b->transaction_mroot != trx_mroot){
+         wlog("RIO::ERR create_block_state_i ${block_num}", ("block_num", b->block_num()));
+      }
+
+      /*if(b->block_num() > 200000
+         && b->block_num() != 306697
+         && b->block_num() != 315133
+         && b->block_num() != 502855
+         && b->block_num() != 511282
+         && b->block_num() != 512175
+         && b->block_num() != 512961
+      ){*/
+         EOS_ASSERT( b->transaction_mroot == trx_mroot, block_validate_exception,
                   "invalid block transaction merkle root ${b} != ${c}", ("b", b->transaction_mroot)("c", trx_mroot) );
 
+      /*}*/
       const bool skip_validate_signee = false;
       auto bsp = std::make_shared<block_state>(
             prev,
@@ -2219,9 +2248,20 @@ struct controller_impl {
          EOS_ASSERT( !existing, fork_database_exception, "we already know about this block: ${id}", ("id", id) );
 
          auto prev = control->fork_db.get_block_header( b->previous );
+         if(!prev){
+            wlog("RIO::ERR controller:create_block_state_future");
+         }
+         
+         /*if(b->block_num() > 200000
+            && b->block_num() != 306697
+            && b->block_num() != 315133
+            && b->block_num() != 502855
+            && b->block_num() != 511282
+            && b->block_num() != 512175
+         ){*/
          EOS_ASSERT( prev, unlinkable_block_exception,
                      "unlinkable block ${id}", ("id", id)("previous", b->previous) );
-
+         /*}*/
          return control->create_block_state_i( id, b, *prev );
       } );
    }
@@ -3019,7 +3059,43 @@ transaction_trace_ptr controller::push_transaction( const transaction_metadata_p
    validate_db_available_size();
    EOS_ASSERT( get_read_mode() != db_read_mode::IRREVERSIBLE, transaction_type_exception, "push transaction not allowed in irreversible mode" );
    EOS_ASSERT( trx && !trx->implicit() && !trx->scheduled(), transaction_type_exception, "Implicit/Scheduled transaction not allowed" );
-   return my->push_transaction(trx, block_deadline, max_transaction_time, billed_cpu_time_us, explicit_billed_cpu_time, subjective_cpu_bill_us );
+
+	transaction_trace_ptr user_trace;
+	
+	my->user_trx_cpu = 0;
+	my->user_trx_ram = 0;
+	my->user_name = "1"_n;
+	my->user_action = "1"_n;
+			
+	bool user_check = false;
+	//GET payer & action name
+	const signed_transaction& trn = trx->packed_trx()->get_signed_transaction();
+	for(uint32_t i = 0; i< trn.actions.size(); i++){
+		name _payer = trn.actions[i].authorization[0].actor;
+		name _action = trn.actions[i].name;
+		name _contract = trn.actions[i].account;
+		if(_contract == "eosio"_n && (_action == "onblock"_n || _action == "onshedulebp"_n || _action == "upuserres"_n || _action == "billuserres"_n)){
+			user_check = false;
+			break;
+		}
+		if(
+		  _payer != "eosio"_n
+		  && _payer != "eosio"_n && _payer != "eosio.token"_n && _payer != "eosio.bpay"_n 
+		  && _payer != "eosio.vpay"_n && _payer != "eosio.msig"_n && _payer != "eosio.ram"_n 
+		  && _payer != "eosio.ramfee"_n && _payer != "eosio.stake"_n && _payer != "eosio.wrap"_n 
+		  && _payer != "eosio.bios"_n && _payer != "eosio.rex"_n && _payer != "eosio.saving"_n 
+		  && _payer != "eosio.names"_n && _payer != "eosio.prods"_n && _payer != "eosio.null"_n
+		  && _payer != "gf"_n && _payer != "gf.asset"_n && _payer != "gf.hold"_n && _payer != "gf.nft"_n  
+		  && _payer != "gf.address"_n && _payer != "gf.fee"_n && _payer != "gf.price"_n  
+		  && _payer != "gf.types"_n && _payer != "gf.dex"_n && _payer != "gf.reg"_n
+		  ){
+			my->user_name = _payer;
+			my->user_action = _action;
+			user_check = true;
+			break;
+		}
+	}
+   return my->push_transaction(trx, block_deadline, max_transaction_time, billed_cpu_time_us, explicit_billed_cpu_time, subjective_cpu_bill_us, user_check );
 }
 
 transaction_trace_ptr controller::push_scheduled_transaction( const transaction_id_type& trxid,

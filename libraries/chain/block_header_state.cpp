@@ -231,6 +231,9 @@ namespace eosio { namespace chain {
    )&&
    {
       EOS_ASSERT( h.timestamp == timestamp, block_validate_exception, "timestamp mismatch" );
+      if(h.previous != previous){
+         wlog("RIO::ERR block_header_state:_finish_next");
+      }
       EOS_ASSERT( h.previous == previous, unlinkable_block_exception, "previous mismatch" );
       EOS_ASSERT( h.confirmed == confirmed, block_validate_exception, "confirmed mismatch" );
       EOS_ASSERT( h.producer == producer, wrong_producer, "wrong producer specified" );

@@ -339,9 +339,10 @@ namespace eosio { namespace chain {
       }
 
       auto itr = index.find( id );
-      if( itr != index.end() )
+      if( itr != index.end() ){
          return *itr;
-
+      }
+      
       return block_header_state_ptr();
    }
 
@@ -355,9 +356,20 @@ namespace eosio { namespace chain {
       EOS_ASSERT( n, fork_database_exception, "attempt to add null block state" );
 
       auto prev_bh = get_block_header_impl( n->header.previous );
+      if(!prev_bh){
+         wlog("RIO::ERR get_block_header_impl ${block_num}", ("block_num", n->header.block_num()));
+      }
 
-      EOS_ASSERT( prev_bh, unlinkable_block_exception,
+      /*if(n->header.block_num() > 200000
+         && n->header.block_num() != 306697
+         && n->header.block_num() != 315133
+         && n->header.block_num() != 502855
+         && n->header.block_num() != 511282
+         && n->header.block_num() != 512175
+      ){*/
+         EOS_ASSERT( prev_bh, unlinkable_block_exception,
                   "unlinkable block", ("id", n->id)("previous", n->header.previous) );
+      /*}*/
 
       if( validate ) {
          try {
