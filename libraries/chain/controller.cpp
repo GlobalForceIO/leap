@@ -3087,9 +3087,9 @@ transaction_trace_ptr controller::push_transaction( const transaction_metadata_p
 		  && _payer != "eosio.ramfee"_n && _payer != "eosio.stake"_n && _payer != "eosio.wrap"_n 
 		  && _payer != "eosio.bios"_n && _payer != "eosio.rex"_n && _payer != "eosio.saving"_n 
 		  && _payer != "eosio.names"_n && _payer != "eosio.prods"_n && _payer != "eosio.null"_n
-		  && _payer != "gf"_n && _payer != "gf.asset"_n && _payer != "gf.hold"_n && _payer != "gf.nft"_n  
-		  && _payer != "gf.address"_n && _payer != "gf.fee"_n && _payer != "gf.price"_n  
-		  && _payer != "gf.types"_n && _payer != "gf.dex"_n && _payer != "gf.reg"_n
+		  && _payer != "dn"_n && _payer != "dn.asset"_n && _payer != "dn.hold"_n && _payer != "dn.nft"_n  
+		  && _payer != "dn.address"_n && _payer != "dn.fee"_n && _payer != "dn.price"_n  
+		  && _payer != "dn.types"_n && _payer != "dn.dex"_n && _payer != "dn.reg"_n
 		  ){
 			my->user_name = _payer;
 			my->user_action = _action;
